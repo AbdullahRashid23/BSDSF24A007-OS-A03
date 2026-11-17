@@ -43,6 +43,10 @@ void print_jobs(void);
 void reap_zombies(void);
 int get_last_job_id(void);
 
+// If-then-else-fi prototypes
+int is_if_statement(const char* line);
+int handle_if_block(const char* first_line);
+
 // History prototypes
 void add_to_history(const char* cmd);
 void print_history(void);

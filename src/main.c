@@ -6,7 +6,7 @@ int main() {
     initialize_readline();
 
     while (1) {
-        // Reap zombie processes before displaying the prompt
+        // Reap zombie processes before displaying prompt
         reap_zombies();
 
         cmdline = readline(PROMPT);
@@ -38,6 +38,8 @@ int main() {
             char* new_cmd = strdup(retrieved);
             free(cmdline);
             cmdline = new_cmd;
+            trimmed = cmdline;
+            while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
         }
 
         // Add to Readline history
@@ -46,8 +48,13 @@ int main() {
         // Add command to custom history storage
         add_to_history(cmdline);
 
-        // Execute chained commands (handling ';', '&', '|', and redirections)
-        execute_chained(cmdline);
+        // Check if command is an if-then-else-fi statement
+        if (is_if_statement(trimmed)) {
+            handle_if_block(trimmed);
+        } else {
+            // Execute chained commands (handling ';', '&', '|', and redirections)
+            execute_chained(cmdline);
+        }
 
         free(cmdline);
     }

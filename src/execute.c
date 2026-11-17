@@ -211,7 +211,6 @@ int execute_line(char* cmdline) {
 void execute_chained(char* line) {
     if (line == NULL || line[0] == '\0') return;
 
-    // Split commands by ';' respecting quotes
     const char* p = line;
     while (*p != '\0') {
         char cmd_buf[MAX_LEN];
@@ -231,7 +230,7 @@ void execute_chained(char* line) {
                     if (bi < MAX_LEN - 1) cmd_buf[bi++] = *p++;
                 }
             } else if (*p == ';') {
-                p++; // Consume ';'
+                p++;
                 break;
             } else {
                 if (bi < MAX_LEN - 1) cmd_buf[bi++] = *p++;
@@ -239,7 +238,6 @@ void execute_chained(char* line) {
         }
         cmd_buf[bi] = '\0';
 
-        // Trim leading and trailing whitespace
         char* start = cmd_buf;
         while (*start == ' ' || *start == '\t') start++;
         int len = strlen(start);
@@ -249,7 +247,6 @@ void execute_chained(char* line) {
 
         if (len == 0) continue;
 
-        // Check for background '&'
         int is_bg = 0;
         if (start[len - 1] == '&') {
             is_bg = 1;
@@ -278,4 +275,87 @@ void execute_chained(char* line) {
             execute_line(start);
         }
     }
+}
+
+int is_if_statement(const char* line) {
+    if (line == NULL) return 0;
+    while (*line == ' ' || *line == '\t') line++;
+    if (strncmp(line, "if", 2) == 0 && (line[2] == ' ' || line[2] == '\t' || line[2] == '\0')) {
+        return 1;
+    }
+    return 0;
+}
+
+int handle_if_block(const char* first_line) {
+    char cond_cmd[MAX_LEN] = {0};
+    const char* p = first_line;
+    while (*p == ' ' || *p == '\t') p++;
+    p += 2; // skip "if"
+    while (*p == ' ' || *p == '\t') p++;
+    strncpy(cond_cmd, p, MAX_LEN - 1);
+
+    #define MAX_BLOCK_LINES 64
+    char* then_lines[MAX_BLOCK_LINES];
+    int then_count = 0;
+    char* else_lines[MAX_BLOCK_LINES];
+    int else_count = 0;
+
+    int in_then = 0;
+    int in_else = 0;
+
+    char* line;
+    while ((line = readline("> ")) != NULL) {
+        char* t = line;
+        while (*t == ' ' || *t == '\t') t++;
+        int len = strlen(t);
+        while (len > 0 && (t[len - 1] == ' ' || t[len - 1] == '\t' || t[len - 1] == '\n')) {
+            t[--len] = '\0';
+        }
+
+        if (strcmp(t, "then") == 0) {
+            in_then = 1;
+            free(line);
+            continue;
+        } else if (strcmp(t, "else") == 0) {
+            in_then = 0;
+            in_else = 1;
+            free(line);
+            continue;
+        } else if (strcmp(t, "fi") == 0) {
+            free(line);
+            break;
+        }
+
+        if (in_else) {
+            if (else_count < MAX_BLOCK_LINES && len > 0) {
+                else_lines[else_count++] = strdup(t);
+            }
+        } else if (in_then) {
+            if (then_count < MAX_BLOCK_LINES && len > 0) {
+                then_lines[then_count++] = strdup(t);
+            }
+        } else {
+            if (cond_cmd[0] == '\0' && len > 0) {
+                strncpy(cond_cmd, t, MAX_LEN - 1);
+            }
+        }
+        free(line);
+    }
+
+    int status = execute_line(cond_cmd);
+
+    if (status == 0) {
+        for (int i = 0; i < then_count; i++) {
+            execute_chained(then_lines[i]);
+        }
+    } else {
+        for (int i = 0; i < else_count; i++) {
+            execute_chained(else_lines[i]);
+        }
+    }
+
+    for (int i = 0; i < then_count; i++) free(then_lines[i]);
+    for (int i = 0; i < else_count; i++) free(else_lines[i]);
+
+    return status;
 }
