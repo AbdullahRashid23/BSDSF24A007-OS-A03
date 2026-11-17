@@ -334,13 +334,13 @@ int handle_builtin(char** arglist) {
         }
         return 1;
     } else if (strcmp(arglist[0], "help") == 0) {
-        // Intentionally missing 'set' here for Feature-9 bug report & fix simulation
         printf("Built-in commands:\n");
         printf("  cd <directory>  : Change working directory\n");
         printf("  exit            : Terminate the shell\n");
         printf("  help            : Display this help message\n");
         printf("  history         : Display command history\n");
         printf("  jobs            : List background jobs\n");
+        printf("  set             : Display all shell variables\n");
         return 1;
     } else if (strcmp(arglist[0], "history") == 0) {
         print_history();
