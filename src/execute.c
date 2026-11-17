@@ -28,6 +28,9 @@ static void execute_child_command(char* cmd) {
         exit(0);
     }
 
+    // Expand variables ($VAR)
+    expand_variables(arglist);
+
     char* infile = NULL;
     char* outfile = NULL;
     char* clean_args[MAXARGS + 1];
@@ -89,6 +92,11 @@ static void execute_child_command(char* cmd) {
 }
 
 static int execute_single_command(char* cmd) {
+    // Check for variable assignment: executed in the shell process itself
+    if (is_assignment(cmd)) {
+        return handle_assignment(cmd) ? 0 : 1;
+    }
+
     int has_redirection = (strchr(cmd, '<') != NULL || strchr(cmd, '>') != NULL);
 
     if (!has_redirection) {
@@ -97,6 +105,9 @@ static int execute_single_command(char* cmd) {
             free_arglist(arglist);
             return 0;
         }
+
+        // Expand variables before checking builtins or running
+        expand_variables(arglist);
 
         if (is_builtin(arglist[0])) {
             int ret = handle_builtin(arglist);
