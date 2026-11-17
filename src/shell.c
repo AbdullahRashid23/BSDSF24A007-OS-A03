@@ -1,5 +1,39 @@
 #include "shell.h"
 
+static char* history[HISTORY_SIZE];
+static int history_count = 0;
+
+void add_to_history(const char* cmd) {
+    if (cmd == NULL || *cmd == '\0') return;
+
+    if (history_count < HISTORY_SIZE) {
+        history[history_count++] = strdup(cmd);
+    } else {
+        free(history[0]);
+        for (int i = 1; i < HISTORY_SIZE; i++) {
+            history[i - 1] = history[i];
+        }
+        history[HISTORY_SIZE - 1] = strdup(cmd);
+    }
+}
+
+void print_history(void) {
+    for (int i = 0; i < history_count; i++) {
+        printf("%4d  %s\n", i + 1, history[i]);
+    }
+}
+
+char* get_history(int index) {
+    if (index >= 0 && index < history_count) {
+        return history[index];
+    }
+    return NULL;
+}
+
+int get_history_count(void) {
+    return history_count;
+}
+
 char* read_cmd(char* prompt, FILE* fp) {
     printf("%s", prompt);
     char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
@@ -87,7 +121,11 @@ int handle_builtin(char** arglist) {
         printf("  cd <directory>  : Change working directory\n");
         printf("  exit            : Terminate the shell\n");
         printf("  help            : Display this help message\n");
+        printf("  history         : Display command history\n");
         printf("  jobs            : List background jobs\n");
+        return 1;
+    } else if (strcmp(arglist[0], "history") == 0) {
+        print_history();
         return 1;
     } else if (strcmp(arglist[0], "jobs") == 0) {
         printf("Job control not yet implemented.\n");
