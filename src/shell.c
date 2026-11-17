@@ -73,45 +73,78 @@ char* read_cmd(char* prompt, FILE* fp) {
 }
 
 char** tokenize(char* cmdline) {
-    // Edge case: empty command line
-    if (cmdline == NULL || cmdline[0] == '\0' || cmdline[0] == '\n') {
+    if (cmdline == NULL || cmdline[0] == '\0') {
         return NULL;
     }
 
     char** arglist = (char**)malloc(sizeof(char*) * (MAXARGS + 1));
-    for (int i = 0; i < MAXARGS + 1; i++) {
-        arglist[i] = (char*)malloc(sizeof(char) * ARGLEN);
-        memset(arglist[i], 0, ARGLEN);
+    for (int i = 0; i <= MAXARGS; i++) {
+        arglist[i] = NULL;
     }
 
-    char* cp = cmdline;
-    char* start;
-    int len;
+    const char* p = cmdline;
     int argnum = 0;
 
-    while (*cp != '\0' && argnum < MAXARGS) {
-        while (*cp == ' ' || *cp == '\t') cp++; // Skip leading whitespace
-        
-        if (*cp == '\0') break; // Line was only whitespace
+    while (*p != '\0' && argnum < MAXARGS) {
+        while (*p == ' ' || *p == '\t' || *p == '\n') p++;
+        if (*p == '\0') break;
 
-        start = cp;
-        len = 1;
-        while (*++cp != '\0' && !(*cp == ' ' || *cp == '\t')) {
-            len++;
+        char buf[MAX_LEN];
+        int bi = 0;
+
+        if (*p == '<' || *p == '>') {
+            buf[bi++] = *p++;
+            buf[bi] = '\0';
+            arglist[argnum++] = strdup(buf);
+            continue;
         }
-        strncpy(arglist[argnum], start, len);
-        arglist[argnum][len] = '\0';
-        argnum++;
+
+        while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '<' && *p != '>') {
+            if (*p == '"' || *p == '\'') {
+                char quote = *p++;
+                while (*p != '\0' && *p != quote) {
+                    if (bi < MAX_LEN - 1) buf[bi++] = *p;
+                    p++;
+                }
+                if (*p == quote) p++;
+            } else {
+                if (bi < MAX_LEN - 1) buf[bi++] = *p;
+                p++;
+            }
+        }
+        buf[bi] = '\0';
+        if (bi > 0) {
+            arglist[argnum++] = strdup(buf);
+        }
     }
 
-    if (argnum == 0) { // No arguments were parsed
-        for(int i = 0; i < MAXARGS + 1; i++) free(arglist[i]);
+    if (argnum == 0) {
         free(arglist);
         return NULL;
     }
 
     arglist[argnum] = NULL;
     return arglist;
+}
+
+void free_arglist(char** arglist) {
+    if (arglist == NULL) return;
+    for (int i = 0; arglist[i] != NULL; i++) {
+        free(arglist[i]);
+    }
+    free(arglist);
+}
+
+int is_builtin(const char* cmd) {
+    if (cmd == NULL) return 0;
+    if (strcmp(cmd, "exit") == 0 ||
+        strcmp(cmd, "cd") == 0 ||
+        strcmp(cmd, "help") == 0 ||
+        strcmp(cmd, "history") == 0 ||
+        strcmp(cmd, "jobs") == 0) {
+        return 1;
+    }
+    return 0;
 }
 
 int handle_builtin(char** arglist) {

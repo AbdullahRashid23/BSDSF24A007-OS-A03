@@ -2,7 +2,6 @@
 
 int main() {
     char* cmdline;
-    char** arglist;
 
     initialize_readline();
 
@@ -33,23 +32,15 @@ int main() {
             cmdline = new_cmd;
         }
 
-        // Add to Readline history (for up/down arrow cycling)
+        // Add to Readline history
         add_history(cmdline);
 
         // Add command to custom history storage
         add_to_history(cmdline);
 
-        if ((arglist = tokenize(cmdline)) != NULL) {
-            if (!handle_builtin(arglist)) {
-                execute(arglist);
-            }
+        // Execute command line (handles pipes and redirections)
+        execute_line(cmdline);
 
-            // Free the memory allocated by tokenize()
-            for (int i = 0; arglist[i] != NULL; i++) {
-                free(arglist[i]);
-            }
-            free(arglist);
-        }
         free(cmdline);
     }
 
