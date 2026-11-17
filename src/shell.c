@@ -7,6 +7,8 @@ static Job background_jobs[MAX_JOBS];
 static int job_count = 0;
 static int next_job_id = 1;
 
+static ShellVar* var_head = NULL;
+
 void add_to_history(const char* cmd) {
     if (cmd == NULL || *cmd == '\0') return;
 
@@ -85,10 +87,121 @@ void print_jobs(void) {
     }
 }
 
+void set_variable(const char* name, const char* value) {
+    ShellVar* curr = var_head;
+    while (curr != NULL) {
+        if (strcmp(curr->name, name) == 0) {
+            free(curr->value);
+            curr->value = strdup(value ? value : "");
+            return;
+        }
+        curr = curr->next;
+    }
+
+    ShellVar* new_node = (ShellVar*)malloc(sizeof(ShellVar));
+    new_node->name = strdup(name);
+    new_node->value = strdup(value ? value : "");
+    new_node->next = var_head;
+    var_head = new_node;
+}
+
+const char* get_variable(const char* name) {
+    ShellVar* curr = var_head;
+    while (curr != NULL) {
+        if (strcmp(curr->name, name) == 0) {
+            return curr->value;
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+void print_variables(void) {
+    ShellVar* curr = var_head;
+    while (curr != NULL) {
+        printf("%s=%s\n", curr->name, curr->value);
+        curr = curr->next;
+    }
+}
+
+int is_assignment(const char* str) {
+    if (str == NULL) return 0;
+    while (*str == ' ' || *str == '\t') str++;
+
+    if (!isalpha((unsigned char)*str) && *str != '_') {
+        return 0;
+    }
+
+    const char* p = str;
+    while (isalnum((unsigned char)*p) || *p == '_') {
+        p++;
+    }
+
+    if (*p == '=') {
+        return 1;
+    }
+    return 0;
+}
+
+int handle_assignment(const char* str) {
+    while (*str == ' ' || *str == '\t') str++;
+
+    const char* eq = strchr(str, '=');
+    if (eq == NULL) return 0;
+
+    int name_len = eq - str;
+    char name[MAX_LEN];
+    if (name_len >= MAX_LEN) name_len = MAX_LEN - 1;
+    strncpy(name, str, name_len);
+    name[name_len] = '\0';
+
+    const char* val_start = eq + 1;
+    char val[MAX_LEN];
+    int vi = 0;
+
+    if (*val_start == '"' || *val_start == '\'') {
+        char quote = *val_start++;
+        while (*val_start != '\0' && *val_start != quote && vi < MAX_LEN - 1) {
+            val[vi++] = *val_start++;
+        }
+    } else {
+        while (*val_start != '\0' && *val_start != '\n' && vi < MAX_LEN - 1) {
+            val[vi++] = *val_start++;
+        }
+        // Trim trailing whitespace
+        while (vi > 0 && (val[vi - 1] == ' ' || val[vi - 1] == '\t')) {
+            vi--;
+        }
+    }
+    val[vi] = '\0';
+
+    set_variable(name, val);
+    return 1;
+}
+
+void expand_variables(char** arglist) {
+    if (arglist == NULL) return;
+
+    for (int i = 0; arglist[i] != NULL; i++) {
+        if (arglist[i][0] == '$') {
+            const char* var_name = arglist[i] + 1;
+            const char* val = get_variable(var_name);
+            if (val == NULL) {
+                val = getenv(var_name);
+            }
+            if (val == NULL) {
+                val = "";
+            }
+            free(arglist[i]);
+            arglist[i] = strdup(val);
+        }
+    }
+}
+
 static char* command_generator(const char* text, int state) {
     static int list_index, len;
     static const char* builtins[] = {
-        "cd", "exit", "help", "history", "jobs", NULL
+        "cd", "exit", "help", "history", "jobs", "set", NULL
     };
 
     if (!state) {
@@ -192,7 +305,8 @@ int is_builtin(const char* cmd) {
         strcmp(cmd, "cd") == 0 ||
         strcmp(cmd, "help") == 0 ||
         strcmp(cmd, "history") == 0 ||
-        strcmp(cmd, "jobs") == 0) {
+        strcmp(cmd, "jobs") == 0 ||
+        strcmp(cmd, "set") == 0) {
         return 1;
     }
     return 0;
@@ -220,6 +334,7 @@ int handle_builtin(char** arglist) {
         }
         return 1;
     } else if (strcmp(arglist[0], "help") == 0) {
+        // Intentionally missing 'set' here for Feature-9 bug report & fix simulation
         printf("Built-in commands:\n");
         printf("  cd <directory>  : Change working directory\n");
         printf("  exit            : Terminate the shell\n");
@@ -232,6 +347,9 @@ int handle_builtin(char** arglist) {
         return 1;
     } else if (strcmp(arglist[0], "jobs") == 0) {
         print_jobs();
+        return 1;
+    } else if (strcmp(arglist[0], "set") == 0) {
+        print_variables();
         return 1;
     }
 

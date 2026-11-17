@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -25,6 +26,12 @@ typedef struct {
     char command[MAX_LEN];
     int job_id;
 } Job;
+
+typedef struct ShellVar {
+    char* name;
+    char* value;
+    struct ShellVar* next;
+} ShellVar;
 
 // Function prototypes
 char* read_cmd(char* prompt, FILE* fp);
@@ -46,6 +53,14 @@ int get_last_job_id(void);
 // If-then-else-fi prototypes
 int is_if_statement(const char* line);
 int handle_if_block(const char* first_line);
+
+// Variable prototypes
+void set_variable(const char* name, const char* value);
+const char* get_variable(const char* name);
+void print_variables(void);
+int is_assignment(const char* str);
+int handle_assignment(const char* str);
+void expand_variables(char** arglist);
 
 // History prototypes
 void add_to_history(const char* cmd);
