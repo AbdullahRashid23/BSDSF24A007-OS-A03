@@ -4,7 +4,9 @@ int main() {
     char* cmdline;
     char** arglist;
 
-    while ((cmdline = read_cmd(PROMPT, stdin)) != NULL) {
+    initialize_readline();
+
+    while ((cmdline = readline(PROMPT)) != NULL) {
         // Skip leading whitespace to inspect command
         char* trimmed = cmdline;
         while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
@@ -31,7 +33,10 @@ int main() {
             cmdline = new_cmd;
         }
 
-        // Add command to history
+        // Add to Readline history (for up/down arrow cycling)
+        add_history(cmdline);
+
+        // Add command to custom history storage
         add_to_history(cmdline);
 
         if ((arglist = tokenize(cmdline)) != NULL) {

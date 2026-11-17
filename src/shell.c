@@ -34,23 +34,42 @@ int get_history_count(void) {
     return history_count;
 }
 
+static char* command_generator(const char* text, int state) {
+    static int list_index, len;
+    static const char* builtins[] = {
+        "cd", "exit", "help", "history", "jobs", NULL
+    };
+
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+    }
+
+    const char* name;
+    while ((name = builtins[list_index++]) != NULL) {
+        if (strncmp(name, text, len) == 0) {
+            return strdup(name);
+        }
+    }
+    return NULL;
+}
+
+static char** shell_completion(const char* text, int start, int end) {
+    (void)end;
+    char** matches = NULL;
+    if (start == 0) {
+        matches = rl_completion_matches(text, command_generator);
+    }
+    return matches;
+}
+
+void initialize_readline(void) {
+    rl_attempted_completion_function = shell_completion;
+}
+
 char* read_cmd(char* prompt, FILE* fp) {
-    printf("%s", prompt);
-    char* cmdline = (char*) malloc(sizeof(char) * MAX_LEN);
-    int c, pos = 0;
-
-    while ((c = getc(fp)) != EOF) {
-        if (c == '\n') break;
-        cmdline[pos++] = c;
-    }
-
-    if (c == EOF && pos == 0) {
-        free(cmdline);
-        return NULL; // Handle Ctrl+D
-    }
-    
-    cmdline[pos] = '\0';
-    return cmdline;
+    (void)fp;
+    return readline(prompt);
 }
 
 char** tokenize(char* cmdline) {
