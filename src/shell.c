@@ -3,6 +3,10 @@
 static char* history[HISTORY_SIZE];
 static int history_count = 0;
 
+static Job background_jobs[MAX_JOBS];
+static int job_count = 0;
+static int next_job_id = 1;
+
 void add_to_history(const char* cmd) {
     if (cmd == NULL || *cmd == '\0') return;
 
@@ -32,6 +36,53 @@ char* get_history(int index) {
 
 int get_history_count(void) {
     return history_count;
+}
+
+void add_job(pid_t pid, const char* cmd) {
+    if (job_count < MAX_JOBS) {
+        background_jobs[job_count].pid = pid;
+        background_jobs[job_count].job_id = next_job_id++;
+        strncpy(background_jobs[job_count].command, cmd, MAX_LEN - 1);
+        background_jobs[job_count].command[MAX_LEN - 1] = '\0';
+        job_count++;
+    }
+}
+
+int get_last_job_id(void) {
+    if (job_count > 0) {
+        return background_jobs[job_count - 1].job_id;
+    }
+    return 1;
+}
+
+void remove_job(pid_t pid) {
+    for (int i = 0; i < job_count; i++) {
+        if (background_jobs[i].pid == pid) {
+            for (int j = i; j < job_count - 1; j++) {
+                background_jobs[j] = background_jobs[j + 1];
+            }
+            job_count--;
+            break;
+        }
+    }
+}
+
+void reap_zombies(void) {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        remove_job(pid);
+    }
+}
+
+void print_jobs(void) {
+    reap_zombies();
+    for (int i = 0; i < job_count; i++) {
+        printf("[%d]  PID: %d   Running   %s\n",
+               background_jobs[i].job_id,
+               background_jobs[i].pid,
+               background_jobs[i].command);
+    }
 }
 
 static char* command_generator(const char* text, int state) {
@@ -180,7 +231,7 @@ int handle_builtin(char** arglist) {
         print_history();
         return 1;
     } else if (strcmp(arglist[0], "jobs") == 0) {
-        printf("Job control not yet implemented.\n");
+        print_jobs();
         return 1;
     }
 

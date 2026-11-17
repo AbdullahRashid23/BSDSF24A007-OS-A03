@@ -18,6 +18,13 @@
 #define ARGLEN 128
 #define PROMPT "FCIT> "
 #define HISTORY_SIZE 100
+#define MAX_JOBS 64
+
+typedef struct {
+    pid_t pid;
+    char command[MAX_LEN];
+    int job_id;
+} Job;
 
 // Function prototypes
 char* read_cmd(char* prompt, FILE* fp);
@@ -25,8 +32,16 @@ char** tokenize(char* cmdline);
 void free_arglist(char** arglist);
 int execute(char** arglist);
 int execute_line(char* cmdline);
+void execute_chained(char* line);
 int handle_builtin(char** arglist);
 int is_builtin(const char* cmd);
+
+// Job control prototypes
+void add_job(pid_t pid, const char* cmd);
+void remove_job(pid_t pid);
+void print_jobs(void);
+void reap_zombies(void);
+int get_last_job_id(void);
 
 // History prototypes
 void add_to_history(const char* cmd);

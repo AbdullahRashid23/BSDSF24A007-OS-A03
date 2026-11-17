@@ -89,7 +89,6 @@ static void execute_child_command(char* cmd) {
 }
 
 static int execute_single_command(char* cmd) {
-    // Check if redirection is present
     int has_redirection = (strchr(cmd, '<') != NULL || strchr(cmd, '>') != NULL);
 
     if (!has_redirection) {
@@ -107,7 +106,6 @@ static int execute_single_command(char* cmd) {
         free_arglist(arglist);
     }
 
-    // Fork and execute
     pid_t cpid = fork();
     if (cpid == -1) {
         perror("fork failed");
@@ -129,12 +127,10 @@ int execute_line(char* cmdline) {
         return 0;
     }
 
-    // Check if pipe is present
     if (strchr(cmdline, '|') == NULL) {
         return execute_single_command(cmdline);
     }
 
-    // Pipeline handling
     char line_copy[MAX_LEN];
     strncpy(line_copy, cmdline, sizeof(line_copy) - 1);
     line_copy[sizeof(line_copy) - 1] = '\0';
@@ -142,7 +138,6 @@ int execute_line(char* cmdline) {
     char* cmds[MAXARGS];
     int num_cmds = 0;
 
-    // Split line by '|'
     char* p = line_copy;
     while (*p != '\0') {
         while (*p == ' ' || *p == '\t') p++;
@@ -179,7 +174,6 @@ int execute_line(char* cmdline) {
         }
 
         if (pids[i] == 0) {
-            // Child process i
             if (i > 0) {
                 dup2(pipes[i - 1][0], STDIN_FILENO);
             }
@@ -187,7 +181,6 @@ int execute_line(char* cmdline) {
                 dup2(pipes[i][1], STDOUT_FILENO);
             }
 
-            // Close all pipe fds in child
             for (int j = 0; j < num_cmds - 1; j++) {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
@@ -198,13 +191,11 @@ int execute_line(char* cmdline) {
         }
     }
 
-    // Parent closes all pipe file descriptors
     for (int i = 0; i < num_cmds - 1; i++) {
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
 
-    // Wait for all children in pipeline
     int last_status = 0;
     for (int i = 0; i < num_cmds; i++) {
         int status;
@@ -215,4 +206,76 @@ int execute_line(char* cmdline) {
     }
 
     return last_status;
+}
+
+void execute_chained(char* line) {
+    if (line == NULL || line[0] == '\0') return;
+
+    // Split commands by ';' respecting quotes
+    const char* p = line;
+    while (*p != '\0') {
+        char cmd_buf[MAX_LEN];
+        int bi = 0;
+
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '\0') break;
+
+        while (*p != '\0') {
+            if (*p == '"' || *p == '\'') {
+                char quote = *p;
+                if (bi < MAX_LEN - 1) cmd_buf[bi++] = *p++;
+                while (*p != '\0' && *p != quote) {
+                    if (bi < MAX_LEN - 1) cmd_buf[bi++] = *p++;
+                }
+                if (*p == quote) {
+                    if (bi < MAX_LEN - 1) cmd_buf[bi++] = *p++;
+                }
+            } else if (*p == ';') {
+                p++; // Consume ';'
+                break;
+            } else {
+                if (bi < MAX_LEN - 1) cmd_buf[bi++] = *p++;
+            }
+        }
+        cmd_buf[bi] = '\0';
+
+        // Trim leading and trailing whitespace
+        char* start = cmd_buf;
+        while (*start == ' ' || *start == '\t') start++;
+        int len = strlen(start);
+        while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t')) {
+            start[--len] = '\0';
+        }
+
+        if (len == 0) continue;
+
+        // Check for background '&'
+        int is_bg = 0;
+        if (start[len - 1] == '&') {
+            is_bg = 1;
+            start[--len] = '\0';
+            while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t')) {
+                start[--len] = '\0';
+            }
+        }
+
+        if (len == 0) continue;
+
+        if (is_bg) {
+            pid_t bg_pid = fork();
+            if (bg_pid == -1) {
+                perror("fork bg failed");
+            } else if (bg_pid == 0) {
+                int code = execute_line(start);
+                exit(code);
+            } else {
+                char job_desc[MAX_LEN + 16];
+                snprintf(job_desc, sizeof(job_desc), "%s &", start);
+                add_job(bg_pid, job_desc);
+                printf("[%d] %d\n", get_last_job_id(), bg_pid);
+            }
+        } else {
+            execute_line(start);
+        }
+    }
 }
