@@ -5,7 +5,15 @@ int main() {
 
     initialize_readline();
 
-    while ((cmdline = readline(PROMPT)) != NULL) {
+    while (1) {
+        // Reap zombie processes before displaying the prompt
+        reap_zombies();
+
+        cmdline = readline(PROMPT);
+        if (cmdline == NULL) {
+            break; // Handle Ctrl+D / EOF
+        }
+
         // Skip leading whitespace to inspect command
         char* trimmed = cmdline;
         while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
@@ -38,8 +46,8 @@ int main() {
         // Add command to custom history storage
         add_to_history(cmdline);
 
-        // Execute command line (handles pipes and redirections)
-        execute_line(cmdline);
+        // Execute chained commands (handling ';', '&', '|', and redirections)
+        execute_chained(cmdline);
 
         free(cmdline);
     }
