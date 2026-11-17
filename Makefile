@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -D_DEFAULT_SOURCE -Iinclude
+LDFLAGS = -lreadline
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
@@ -11,7 +12,7 @@ OBJS = $(OBJ_DIR)/main.o $(OBJ_DIR)/shell.o $(OBJ_DIR)/execute.o
 all: $(TARGET)
 
 $(TARGET): $(OBJS) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c include/shell.h | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@

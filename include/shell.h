@@ -9,6 +9,9 @@
 #include <sys/wait.h>
 #include <errno.h>
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 #define MAX_LEN 512
 #define MAXARGS 10
 #define ARGLEN 30
@@ -26,5 +29,8 @@ void add_to_history(const char* cmd);
 void print_history(void);
 char* get_history(int index);
 int get_history_count(void);
+
+// Readline completion
+void initialize_readline(void);
 
 #endif // SHELL_H
